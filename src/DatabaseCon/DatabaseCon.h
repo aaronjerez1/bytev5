@@ -2,7 +2,7 @@
 #define DATABASECON_H
 
 #include "IDatabaseCon.h"
-#include "../../database/SqliteDatabase.h"
+#include "../../notDatabase/SqliteDatabase.h"
 #include <boost/thread/recursive_mutex.hpp>
 #include "../../shared/ScopedLock.h"
 

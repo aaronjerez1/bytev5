@@ -7,6 +7,7 @@
 #include "../../json/value.h"
 #include "../NewcoinAddress/NewcoinAddress.h"
 #include "ValidatorSource.h"
+#include <boost/filesystem.hpp>
 // Validator source enum to be shared
 
 class IUniqueNodeList {

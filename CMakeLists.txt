@@ -19,10 +19,14 @@ add_executable(bytev5
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
+find_package(boost_filesystem  REQUIRED CONFIG)
+find_package(boost_asio  REQUIRED CONFIG)
+#find_package(boost_test  REQUIRED CONFIG)
 
 # Include directories
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR})
+
 
 # Link directories and libraries
 target_link_libraries(bytev5 PRIVATE
@@ -30,8 +34,8 @@ target_link_libraries(bytev5 PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
     ${Protobuf_LIBRARIES}
+    ${Boost_LIBRARIES}
     sqlite3
-    boost_asio
     boost_filesystem
     boost_format
     boost_interprocess
@@ -41,5 +45,5 @@ target_link_libraries(bytev5 PRIVATE
 )
 
 # Enable Protobuf generation
-#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/newcoin.proto)
-#target_sources(bytev5 PRIVATE ${PROTO_SRCS} ${PROTO_HDRS})
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/newcoin.proto)
+target_sources(bytev5 PRIVATE ${PROTO_SRCS} ${PROTO_HDRS})

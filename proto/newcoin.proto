@@ -1,0 +1,258 @@
+syntax = "proto3";
+
+package newcoin;
+
+enum MessageType {
+    MESSAGE_TYPE_UNKNOWN = 0; // Default value
+    mtHELLO = 1;
+    mtERROR_MSG = 2;
+    mtPING = 3;
+
+    // network presence detection
+    mtGET_CONTACTS = 10;
+    mtCONTACT = 11;
+    mtGET_PEERS = 12;
+    mtPEERS = 13;
+
+    // operations for 'small' nodes
+    mtSEARCH_TRANSACTION = 20;
+    mtGET_ACCOUNT = 21;
+    mtACCOUNT = 22;
+
+    // transaction and ledger processing
+    mtTRANSACTION = 30;
+    mtGET_LEDGER = 31;
+    mtLEDGER_DATA = 32;
+    mtPROPOSE_LEDGER = 33;
+    mtSTATUS_CHANGE = 34;
+    mtHAVE_SET = 35;
+
+    // data replication and synchronization
+    mtGET_VALIDATIONS = 40;
+    mtVALIDATION = 41;
+    mtGET_OBJECT = 42;
+    mtOBJECT = 43;
+}
+
+message TMHello {
+    uint32 version = 1;
+    uint32 ledgerIndex = 2;
+    uint64 netTime = 3;
+    bytes nodePublic = 4;
+    bytes nodeProof = 5;
+    uint32 ipv4Port = 6;
+    bytes closedLedger = 7;
+    bytes previousLedger = 8;
+}
+
+enum TransactionStatus {
+    TRANSACTION_STATUS_UNKNOWN = 0; // Default value
+    tsNEW = 1;
+    tsCURRENT = 2;
+    tsCOMMITTED = 3;
+    tsREJECT_CONFLICT = 4;
+    tsREJECT_INVALID = 5;
+    tsREJECT_FUNDS = 6;
+    tsHELD_SEQ = 7;
+    tsHELD_LEDGER = 8;
+}
+
+message TMTransaction {
+    bytes rawTransaction = 1;
+    TransactionStatus status = 2;
+    uint64 receiveTimestamp = 3;
+    uint32 ledgerIndexPossible = 4;
+    uint32 ledgerIndexFinal = 5;
+    bytes conflictingTransaction = 6;
+}
+
+enum NodeStatus {
+    NODE_STATUS_UNKNOWN = 0; // Default value
+    nsCONNECTING = 1;
+    nsCONNECTED = 2;
+    nsMONITORING = 3;
+    nsVALIDATING = 4;
+    nsSHUTTING = 5;
+}
+
+enum NodeEvent {
+    NODE_EVENT_UNKNOWN = 0; // Default value
+    neCLOSING_LEDGER = 1;
+    neACCEPTED_LEDGER = 2;
+    neSWITCHED_LEDGER = 3;
+    neLOST_SYNC = 4;
+}
+
+message TMStatusChange {
+    NodeStatus newStatus = 1;
+    NodeEvent newEvent = 2;
+    uint32 ledgerSeq = 3;
+    bytes ledgerHash = 4;
+    bytes previousLedgerHash = 5;
+    uint64 networkTime = 6;
+}
+
+message TMProposeSet {
+    uint32 proposeSeq = 1;
+    bytes currentTxHash = 2;
+    bytes nodePubKey = 3;
+    bytes signature = 4;
+    repeated bytes addedTransactions = 5;
+    repeated bytes removedTransactions = 6;
+}
+
+enum TxSetStatus {
+    TX_SET_STATUS_UNKNOWN = 0; // Default value
+    tsHAVE = 1;
+    tsCAN_GET = 2;
+    tsNEED = 3;
+}
+
+message TMHaveTransactionSet {
+    TxSetStatus status = 1;
+    bytes hash = 2;
+}
+
+message TMValidation {
+    bytes validation = 1;
+}
+
+message TMGetValidations {
+    uint32 ledgerIndex = 1;
+    repeated bytes hanko = 2;
+    uint32 count = 3;
+}
+
+message TMContact {
+    bytes pubKey = 1;
+    uint32 softwareVersion = 2;
+    uint32 protoVersion = 3;
+    uint64 nodeFlags = 4;
+    uint64 timestamp = 5;
+    repeated bytes nodeInfo = 6;
+    bytes signature = 7;
+}
+
+message TMGetContacts {
+    repeated bytes nodeIDs = 1;
+    uint32 nodeCount = 2;
+}
+
+message TMGetPeers {
+    uint32 doWeNeedThis = 1;
+}
+
+message TMIPv4EndPoint {
+    uint32 ipv4 = 1;
+    uint32 ipv4Port = 2;
+}
+
+message TMPeers {
+    repeated TMIPv4EndPoint nodes = 1;
+}
+
+message TMSearchTransaction {
+    uint32 maxTrans = 1;
+    bytes toAccount = 2;
+    bytes fromAccount = 3;
+    uint32 minLedger = 4;
+    bytes fromAcctSeq = 5;
+    repeated bytes transID = 6;
+}
+
+message TMGetAccount {
+    repeated bytes acctID = 1;
+    uint32 seq = 2;
+}
+
+message Account {
+    bytes accountID = 1;
+    uint64 balance = 2;
+    uint32 accountSeq = 3;
+    uint32 ledgerSeq = 4;
+}
+
+message TMAccount {
+    repeated Account accounts = 1;
+    uint32 seq = 2;
+}
+
+message TMIndexedObject {
+    enum ObjectType {
+        OBJECT_TYPE_UNKNOWN = 0; // Default value
+        otTRANSACTION = 1;
+        otTRANSACTION_NODE = 2;
+        otTRANSACTION_LEAF = 3;
+        otACCOUNT = 4;
+        otACCOUNT_NODE = 5;
+        otACCOUNT_LEAF = 6;
+        otLEDGER = 7;
+    }
+    bytes hash = 1;
+    ObjectType type = 2;
+}
+
+message TMGetObjectByHash {
+    TMIndexedObject object = 1;
+    uint32 seq = 2;
+}
+
+message TMObjectByHash {
+    TMIndexedObject object = 1;
+    bytes data = 2;
+    uint32 seq = 3;
+}
+
+message TMLedgerNode {
+    bytes nodedata = 1;
+    bytes nodeid = 2;
+}
+
+enum TMLedgerInfoType {
+    LEDGER_INFO_TYPE_UNKNOWN = 0; // Default value
+    liBASE = 1;
+    liTX_NODE = 2;
+    liAS_NODE = 3;
+    liTS_CANDIDATE = 4;
+}
+
+enum TMLedgerType {
+    LEDGER_TYPE_UNKNOWN = 0; // Default value
+    ltACCEPTED = 1;
+    ltCURRENT = 2;
+    ltCLOSED = 3;
+}
+
+message TMGetLedger {
+    TMLedgerInfoType itype = 1;
+    TMLedgerType ltype = 2;
+    bytes ledgerHash = 3;
+    uint32 ledgerSeq = 4;
+    repeated bytes nodeIDs = 5;
+    uint32 requestCookie = 6;
+}
+
+message TMLedgerData {
+    bytes ledgerHash = 1;
+    uint32 ledgerSeq = 2;
+    TMLedgerInfoType type = 3;
+    repeated TMLedgerNode nodes = 4;
+    uint32 requestCookie = 5;
+}
+
+message TMPing {
+    enum PingType {
+        PING_TYPE_UNKNOWN = 0; // Default value
+        PING = 1;
+        PONG = 2;
+    }
+    PingType type = 1;
+    uint32 seq = 2;
+    uint64 pingTime = 3;
+    uint64 netTime = 4;
+}
+
+message TMErrorMsg {
+    int32 errorCode = 1;
+    string message = 2;
+}

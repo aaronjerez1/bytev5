@@ -14,7 +14,7 @@
 #include <boost/utility/string_ref.hpp>
 #include <iostream>
 
-#include "../../database/SqliteDatabase.h"
+#include "../../notDatabase/SqliteDatabase.h"
 
 // How often to enforce policies.
 #define POLICY_INTERVAL_SECONDS	5

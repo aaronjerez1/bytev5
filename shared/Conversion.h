@@ -1,5 +1,7 @@
 #include "uint256.h"
 #include <string>
+#include <boost/bind/bind.hpp>
+using namespace boost::placeholders;
 
 extern uint160 protobufTo160(const std::string& buf);
 extern uint256 protobufTo256(const std::string& hash);

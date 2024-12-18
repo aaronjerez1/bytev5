@@ -12,7 +12,7 @@
 #include "../../Config.h"
 #include "../Application.h"
 #include "../../shared/Conversion.h"
-#include "SerializedTransaction.h"
+//#include "SerializedTransaction.h"
 #include "../../shared/utils.h"
 #include "../../shared/Log.h"
 

@@ -13,7 +13,7 @@
 #include "../DatabaseCon/IDatabaseCon.h"
 #include "../ConnectionPool/IConnectionPool.h"
 
-#include "../../database/SqliteDatabase.h"
+#include "../../notDatabase/SqliteDatabase.h"
 
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>

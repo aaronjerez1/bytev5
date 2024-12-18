@@ -6,7 +6,7 @@
 #include <vector>
 #include "../../shared/PackedMessage.h"
 #include "../../json/value.h"
-//#include "../../build/newcoin.pb.h"
+#include "../../build/newcoin.pb.h"
 #include "../../shared/types.h"
 #include "../../shared/uint256.h"
 

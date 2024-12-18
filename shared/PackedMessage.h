@@ -14,7 +14,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/cstdint.hpp>
 
-//#include "../build/newcoin.pb.h"
+#include "../build/newcoin.pb.h"
 
 // The header size for packed messages
 // len(4)+type(2)

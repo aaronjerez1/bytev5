@@ -18,6 +18,7 @@
 #include "../../shared/Serializer.h"
 #include "../NewcoinAddress/NewcoinAddress.h" // Include the full definition
 #include "../UniqueNodeList/IUniqueNodeList.h"
+#include "../DatabaseCon/IDatabaseCon.h"
 #include "IWallet.h"
 
 class Ledger;

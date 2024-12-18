@@ -96,12 +96,12 @@ public:
 	CBigNum(char n) { bn = BN_new(); if (n >= 0) setulong(n); else setint64(n); }
 	CBigNum(short n) { bn = BN_new(); if (n >= 0) setulong(n); else setint64(n); }
 	CBigNum(int n) { bn = BN_new(); if (n >= 0) setulong(n); else setint64(n); }
-	CBigNum(long n) { bn = BN_new(); if (n >= 0) setulong(n); else setint64(n); }
+	//CBigNum(long n) { bn = BN_new(); if (n >= 0) setulong(n); else setint64(n); }
 	CBigNum(int64_t n) { bn = BN_new(); setint64(n); }
 	CBigNum(unsigned char n) { bn = BN_new(); setulong(n); }
 	CBigNum(unsigned short n) { bn = BN_new(); setulong(n); }
 	CBigNum(unsigned int n) { bn = BN_new(); setulong(n); }
-	CBigNum(unsigned long n) { bn = BN_new(); setulong(n); }
+	//CBigNum(unsigned long n) { bn = BN_new(); setulong(n); }
 	CBigNum(uint64_t n) { bn = BN_new(); setuint64(n); }
 	explicit CBigNum(uint256 n) { bn = BN_new(); setuint256(n); }
 

@@ -1,0 +1,23 @@
+﻿{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "wsl",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/wsl-toolchain.cmake",
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "environment": {
+                "VCPKG_ROOT": "/usr/local/vcpkg"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "wsl",
+            "configurePreset": "wsl"
+        }
+    ]
+}

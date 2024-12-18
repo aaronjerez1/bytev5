@@ -301,7 +301,7 @@ std::shared_ptr<IPeer> ConnectionPool::peerConnect(const std::string& strIp, int
 
 		if ((it = mIpMap.find(pipPeer)) == mIpMap.end())
 		{
-			std::shared_ptr<IPeer>	ppNew(IPeer::create(ioService, mCtx));
+			std::shared_ptr<IPeer>	ppNew(mPeer->create(ioService, mCtx, nullptr));
 
 			// Did not find it.  Not already connecting or connected.
 			ppNew->connect(strIp, iPort);

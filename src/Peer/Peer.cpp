@@ -22,13 +22,20 @@
 // Node has this long to verify its identity from connection accepted or connection attempt.
 #define NODE_VERIFY_SECONDS		15
 
-Peer::Peer(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx) :
+Peer::Peer(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx, std::shared_ptr<IConnectionPool> mConnectionPool) :
 	mHelloed(false),
 	mDetaching(false),
 	mSocketSsl(io_service, ctx),
-	mVerifyTimer(io_service)
+	mVerifyTimer(io_service),
+    ioService(io_service),
+    mConnectionPool(mConnectionPool)
 {
 	// Log(lsDEBUG) << "CREATING PEER: " << ADDRESS(this);
+}
+
+std::shared_ptr<IPeer> Peer::create(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx, std::shared_ptr<IConnectionPool> mConnectionPool)
+{
+return std::make_shared<Peer>(io_service, ctx, mConnectionPool);
 }
 
 void Peer::handle_write(const boost::system::error_code& error, size_t bytes_transferred)
@@ -90,7 +97,7 @@ void Peer::detach(const char *rsn)
 
 		if (mNodePublic.isValid())
 		{
-			theApp->getConnectionPool().peerDisconnected(shared_from_this(), mNodePublic);
+			mConnectionPool->peerDisconnected(shared_from_this(), mNodePublic);
 
 			mNodePublic.clear();		// Be idompotent.
 		}
@@ -99,7 +106,7 @@ void Peer::detach(const char *rsn)
 		{
 			// Connection might be part of scanning.  Inform connect failed.
 			// Might need to scan. Inform connection closed.
-			theApp->getConnectionPool().peerClosed(shared_from_this(), mIpPort.first, mIpPort.second);
+			mConnectionPool->peerClosed(shared_from_this(), mIpPort.first, mIpPort.second);
 
 			mIpPort.first.clear();		// Be idompotent.
 		}
@@ -149,7 +156,7 @@ void Peer::connect(const std::string strIp, int iPort)
 
 	boost::asio::ip::tcp::resolver::query	query(strIp, boost::lexical_cast<std::string>(iPortAct),
 			boost::asio::ip::resolver_query_base::numeric_host|boost::asio::ip::resolver_query_base::numeric_service);
-	boost::asio::ip::tcp::resolver				resolver(theApp->getIOService());
+	boost::asio::ip::tcp::resolver				resolver(ioService);
 	boost::system::error_code					err;
 	boost::asio::ip::tcp::resolver::iterator	itrEndpoint	= resolver.resolve(query, err);
 
@@ -561,194 +568,194 @@ void Peer::processReadBuffer()
 	}
 }
 
-void Peer::recvHello(newcoin::TMHello& packet)
-{
-#ifdef DEBUG
-	Log(lsINFO) << "Recv(Hello) v=" << packet.version() << ", index=" << packet.ledgerindex();
-#endif
-	bool	bDetach	= true;
+// void Peer::recvHello(newcoin::TMHello& packet)
+// {
+// #ifdef DEBUG
+// 	Log(lsINFO) << "Recv(Hello) v=" << packet.version() << ", index=" << packet.ledgerindex();
+// #endif
+// 	bool	bDetach	= true;
 
-	// Cancel verification timeout.
-	(void) mVerifyTimer.cancel();
+// 	// Cancel verification timeout.
+// 	(void) mVerifyTimer.cancel();
 
-	if (!mNodePublic.setNodePublic(packet.nodepublic()))
-	{
-		Log(lsINFO) << "Recv(Hello): Disconnect: Bad node public key.";
-	}
-	else if (!mNodePublic.verifyNodePublic(mCookieHash, packet.nodeproof()))
-	{ // Unable to verify they have private key for claimed public key.
-		Log(lsINFO) << "Recv(Hello): Disconnect: Failed to verify session.";
-	}
-	else
-	{ // Successful connection.
-		Log(lsINFO) << "Recv(Hello): Connect: " << mNodePublic.humanNodePublic();
+// 	if (!mNodePublic.setNodePublic(packet.nodepublic()))
+// 	{
+// 		Log(lsINFO) << "Recv(Hello): Disconnect: Bad node public key.";
+// 	}
+// 	else if (!mNodePublic.verifyNodePublic(mCookieHash, packet.nodeproof()))
+// 	{ // Unable to verify they have private key for claimed public key.
+// 		Log(lsINFO) << "Recv(Hello): Disconnect: Failed to verify session.";
+// 	}
+// 	else
+// 	{ // Successful connection.
+// 		Log(lsINFO) << "Recv(Hello): Connect: " << mNodePublic.humanNodePublic();
 
-		if (mClientConnect)
-		{
-			// If we connected due to scan, no longer need to scan.
-			theApp->getConnectionPool().peerVerified(shared_from_this());
-		}
+// 		if (mClientConnect)
+// 		{
+// 			// If we connected due to scan, no longer need to scan.
+// 			mConnectionPool->peerVerified(shared_from_this());
+// 		}
 
-		if (!theApp->getConnectionPool().peerConnected(shared_from_this(), mNodePublic, getIP(), getPort()))
-		{ // Already connected, self, or some other reason.
-			Log(lsINFO) << "Recv(Hello): Disconnect: Extraneous connection.";
-		}
-		else
-		{
-			if (mClientConnect)
-			{
-				// No longer connecting as client.
-				mClientConnect	= false;
-			}
-			else
-			{
-				// Take a guess at remotes address.
-				std::string	strIP	= getSocket().remote_endpoint().address().to_string();
-				int			iPort	= packet.ipv4port();
+// 		if (!mConnectionPool->peerConnected(shared_from_this(), mNodePublic, getIP(), getPort()))
+// 		{ // Already connected, self, or some other reason.
+// 			Log(lsINFO) << "Recv(Hello): Disconnect: Extraneous connection.";
+// 		}
+// 		else
+// 		{
+// 			if (mClientConnect)
+// 			{
+// 				// No longer connecting as client.
+// 				mClientConnect	= false;
+// 			}
+// 			else
+// 			{
+// 				// Take a guess at remotes address.
+// 				std::string	strIP	= getSocket().remote_endpoint().address().to_string();
+// 				int			iPort	= packet.ipv4port();
 
-				theApp->getConnectionPool().savePeer(strIP, iPort, UniqueNodeList::vsInbound);
-			}
+// 				mConnectionPool->savePeer(strIP, iPort, validatorSource::vsInbound);
+// 			}
 
-			// Consider us connected.  No longer accepting mtHELLO.
-			mHelloed		= true;
+// 			// Consider us connected.  No longer accepting mtHELLO.
+// 			mHelloed		= true;
 
-			// XXX Set timer: connection is in grace period to be useful.
-			// XXX Set timer: connection idle (idle may vary depending on connection type.)
+// 			// XXX Set timer: connection is in grace period to be useful.
+// 			// XXX Set timer: connection idle (idle may vary depending on connection type.)
 
-			if ((packet.has_closedledger()) && (packet.closedledger().size() == (256 / 8)))
-			{
-				memcpy(mClosedLedgerHash.begin(), packet.closedledger().data(), 256 / 8);
-				if ((packet.has_previousledger()) && (packet.previousledger().size() == (256 / 8)))
-					memcpy(mPreviousLedgerHash.begin(), packet.previousledger().data(), 256 / 8);
-				else mPreviousLedgerHash.zero();
-				mClosedLedgerTime = boost::posix_time::second_clock::universal_time();
-			}
+// 			if ((packet.has_closedledger()) && (packet.closedledger().size() == (256 / 8)))
+// 			{
+// 				memcpy(mClosedLedgerHash.begin(), packet.closedledger().data(), 256 / 8);
+// 				if ((packet.has_previousledger()) && (packet.previousledger().size() == (256 / 8)))
+// 					memcpy(mPreviousLedgerHash.begin(), packet.previousledger().data(), 256 / 8);
+// 				else mPreviousLedgerHash.zero();
+// 				mClosedLedgerTime = boost::posix_time::second_clock::universal_time();
+// 			}
 
-			bDetach	= false;
-		}
-	}
+// 			bDetach	= false;
+// 		}
+// 	}
 
-	if (bDetach)
-	{
-		mNodePublic.clear();
-		detach("recvh");
-	}
-	else
-	{
-		sendGetPeers();
-	}
-}
+// 	if (bDetach)
+// 	{
+// 		mNodePublic.clear();
+// 		detach("recvh");
+// 	}
+// 	else
+// 	{
+// 		sendGetPeers();
+// 	}
+// }
 
-void Peer::recvTransaction(newcoin::TMTransaction& packet)
-{
-#ifdef DEBUG
-	std::cerr << "Got transaction from peer" << std::endl;
-#endif
+// void Peer::recvTransaction(newcoin::TMTransaction& packet)
+// {
+// #ifdef DEBUG
+// 	std::cerr << "Got transaction from peer" << std::endl;
+// #endif
 
-	Transaction::pointer tx;
-#ifndef TRUST_NETWORK
-	try
-	{
-#endif
-		std::string rawTx = packet.rawtransaction();
-		Serializer s(rawTx);
-		SerializerIterator sit(s);
-		SerializedTransaction::pointer stx = boost::make_shared<SerializedTransaction>(boost::ref(sit));
+// 	Transaction::pointer tx;
+// #ifndef TRUST_NETWORK
+// 	try
+// 	{
+// #endif
+// 		std::string rawTx = packet.rawtransaction();
+// 		Serializer s(rawTx);
+// 		SerializerIterator sit(s);
+// 		SerializedTransaction::pointer stx = boost::make_shared<SerializedTransaction>(boost::ref(sit));
 
-		tx = boost::make_shared<Transaction>(stx, true);
-		if (tx->getStatus() == INVALID) throw(0);
-#ifndef TRUST_NETWORK
-	}
-	catch (...)
-	{
-#ifdef DEBUG
-		std::cerr << "Transaction from peer fails validity tests" << std::endl;
-		Json::StyledStreamWriter w;
-		w.write(std::cerr, tx->getJson(true));
-#endif
-		return;
-	}
-#endif
+// 		tx = boost::make_shared<Transaction>(stx, true);
+// 		if (tx->getStatus() == INVALID) throw(0);
+// #ifndef TRUST_NETWORK
+// 	}
+// 	catch (...)
+// 	{
+// #ifdef DEBUG
+// 		std::cerr << "Transaction from peer fails validity tests" << std::endl;
+// 		Json::StyledStreamWriter w;
+// 		w.write(std::cerr, tx->getJson(true));
+// #endif
+// 		return;
+// 	}
+// #endif
 
-	uint32 targetLedger = 0;
-	if (packet.has_ledgerindexfinal())
-		targetLedger = packet.ledgerindexfinal();
-	else if (packet.has_ledgerindexpossible())
-		targetLedger = packet.ledgerindexpossible();
+// 	uint32 targetLedger = 0;
+// 	if (packet.has_ledgerindexfinal())
+// 		targetLedger = packet.ledgerindexfinal();
+// 	else if (packet.has_ledgerindexpossible())
+// 		targetLedger = packet.ledgerindexpossible();
 
-	tx = theApp->getOPs().processTransaction(tx, targetLedger, this);
+// 	tx = theApp->getOPs().processTransaction(tx, targetLedger, this);
 
-	if(tx->getStatus() != INCLUDED)
-	{ // transaction wasn't accepted into ledger
-#ifdef DEBUG
-		std::cerr << "Transaction from peer won't go in ledger" << std::endl;
-#endif
-	}
-}
+// 	if(tx->getStatus() != INCLUDED)
+// 	{ // transaction wasn't accepted into ledger
+// #ifdef DEBUG
+// 		std::cerr << "Transaction from peer won't go in ledger" << std::endl;
+// #endif
+// 	}
+// }
 
-void Peer::recvPropose(newcoin::TMProposeSet& packet)
-{
-	if ((packet.currenttxhash().size() != 32) || (packet.nodepubkey().size() < 28) ||
-		(packet.signature().size() < 56))
-	{
-		Log(lsWARNING) << "Received proposal is malformed";
-		return;
-	}
+// void Peer::recvPropose(newcoin::TMProposeSet& packet)
+// {
+// 	if ((packet.currenttxhash().size() != 32) || (packet.nodepubkey().size() < 28) ||
+// 		(packet.signature().size() < 56))
+// 	{
+// 		Log(lsWARNING) << "Received proposal is malformed";
+// 		return;
+// 	}
 
-	uint32 proposeSeq = packet.proposeseq();
-	uint256 currentTxHash;
-	memcpy(currentTxHash.begin(), packet.currenttxhash().data(), 32);
+// 	uint32 proposeSeq = packet.proposeseq();
+// 	uint256 currentTxHash;
+// 	memcpy(currentTxHash.begin(), packet.currenttxhash().data(), 32);
 
-	if(theApp->getOPs().recvPropose(proposeSeq, currentTxHash, packet.nodepubkey(), packet.signature()))
-	{ // FIXME: Not all nodes will want proposals 
-		PackedMessage::pointer message = boost::make_shared<PackedMessage>(packet, newcoin::mtPROPOSE_LEDGER);
-		theApp->getConnectionPool().relayMessage(this, message);
-	}
-}
+// 	if(theApp->getOPs().recvPropose(proposeSeq, currentTxHash, packet.nodepubkey(), packet.signature()))
+// 	{ // FIXME: Not all nodes will want proposals 
+// 		PackedMessage::pointer message = boost::make_shared<PackedMessage>(packet, newcoin::mtPROPOSE_LEDGER);
+// 		mConnectionPool->relayMessage(this, message);
+// 	}
+// }
 
-void Peer::recvHaveTxSet(newcoin::TMHaveTransactionSet& packet)
-{
-	// FIXME: We should have some limit on the number of HaveTxSet messages a peer can send us
-	// per consensus pass, to keep a peer from running up our memory without limit
-	uint256 hashes;
-	if (packet.hash().size() != (256 / 8))
-	{
-		punishPeer(PP_INVALID_REQUEST);
-		return;
-	}
-	memcpy(hashes.begin(), packet.hash().data(), 32);
-	if (!theApp->getOPs().hasTXSet(shared_from_this(), hashes, packet.status()))
-		punishPeer(PP_UNWANTED_DATA);
-}
+// void Peer::recvHaveTxSet(newcoin::TMHaveTransactionSet& packet)
+// {
+// 	// FIXME: We should have some limit on the number of HaveTxSet messages a peer can send us
+// 	// per consensus pass, to keep a peer from running up our memory without limit
+// 	uint256 hashes;
+// 	if (packet.hash().size() != (256 / 8))
+// 	{
+// 		punishPeer(PP_INVALID_REQUEST);
+// 		return;
+// 	}
+// 	memcpy(hashes.begin(), packet.hash().data(), 32);
+// 	if (!theApp->getOPs().hasTXSet(shared_from_this(), hashes, packet.status()))
+// 		punishPeer(PP_UNWANTED_DATA);
+// }
 
-void Peer::recvValidation(newcoin::TMValidation& packet)
-{
-	if (packet.validation().size() < 50)
-	{
-		punishPeer(PP_UNKNOWN_REQUEST);
-		return;
-	}
-	try
-	{
-		Serializer s(packet.validation());
-		SerializerIterator sit(s);
-		SerializedValidation::pointer val = boost::make_shared<SerializedValidation>(boost::ref(sit));
-		if (!val->isValid())
-		{
-			punishPeer(PP_UNKNOWN_REQUEST);
-			return;
-		}
-		if (theApp->getOPs().recvValidation(val))
-		{
-			PackedMessage::pointer message = boost::make_shared<PackedMessage>(packet, newcoin::mtVALIDATION);
-			theApp->getConnectionPool().relayMessage(this, message);
-		}
-	}
-	catch (...)
-	{
-		punishPeer(PP_UNKNOWN_REQUEST);
-	}
-}
+// void Peer::recvValidation(newcoin::TMValidation& packet)
+// {
+// 	if (packet.validation().size() < 50)
+// 	{
+// 		punishPeer(PP_UNKNOWN_REQUEST);
+// 		return;
+// 	}
+// 	try
+// 	{
+// 		Serializer s(packet.validation());
+// 		SerializerIterator sit(s);
+// 		SerializedValidation::pointer val = boost::make_shared<SerializedValidation>(boost::ref(sit));
+// 		if (!val->isValid())
+// 		{
+// 			punishPeer(PP_UNKNOWN_REQUEST);
+// 			return;
+// 		}
+// 		if (theApp->getOPs().recvValidation(val))
+// 		{
+// 			PackedMessage::pointer message = boost::make_shared<PackedMessage>(packet, newcoin::mtVALIDATION);
+// 			mConnectionPool->relayMessage(this, message);
+// 		}
+// 	}
+// 	catch (...)
+// 	{
+// 		punishPeer(PP_UNKNOWN_REQUEST);
+// 	}
+// }
 
 void Peer::recvGetValidation(newcoin::TMGetValidations& packet)
 {
@@ -762,38 +769,38 @@ void Peer::recvGetContacts(newcoin::TMGetContacts& packet)
 {
 }
 
-// return a list of your favorite people
-// TODO: filter out all the LAN peers
-// TODO: filter out the peer you are talking to
-void Peer::recvGetPeers(newcoin::TMGetPeers& packet)
-{
-	std::vector<std::string> addrs;
+// // return a list of your favorite people
+// // TODO: filter out all the LAN peers
+// // TODO: filter out the peer you are talking to
+// void Peer::recvGetPeers(newcoin::TMGetPeers& packet)
+// {
+// 	std::vector<std::string> addrs;
 
-	theApp->getConnectionPool().getTopNAddrs(30, addrs);
+// 	mConnectionPool->getTopNAddrs(30, addrs);
 
-	if (!addrs.empty())
-	{
-		newcoin::TMPeers peers;
+// 	if (!addrs.empty())
+// 	{
+// 		newcoin::TMPeers peers;
 
-		for (int n=0; n<addrs.size(); n++)
-		{
-			std::string strIP;
-			int			iPort;
+// 		for (int n=0; n<addrs.size(); n++)
+// 		{
+// 			std::string strIP;
+// 			int			iPort;
 
-			splitIpPort(addrs[n], strIP, iPort);
+// 			splitIpPort(addrs[n], strIP, iPort);
 
-			// XXX This should also ipv6
-			newcoin::TMIPv4EndPoint* addr=peers.add_nodes();
-			addr->set_ipv4(inet_addr(strIP.c_str()));
-			addr->set_ipv4port(iPort);
+// 			// XXX This should also ipv6
+// 			newcoin::TMIPv4EndPoint* addr=peers.add_nodes();
+// 			addr->set_ipv4(inet_addr(strIP.c_str()));
+// 			addr->set_ipv4port(iPort);
 
-			Log(lsINFO) << "Peer: Teaching: " << ADDRESS(this) << ": " << n << ": " << strIP << " " << iPort;
-		}
+// 			Log(lsINFO) << "Peer: Teaching: " << ADDRESS(this) << ": " << n << ": " << strIP << " " << iPort;
+// 		}
 
-		PackedMessage::pointer message = boost::make_shared<PackedMessage>(peers, newcoin::mtPEERS);
-		sendPacket(message);
-	}
-}
+// 		PackedMessage::pointer message = boost::make_shared<PackedMessage>(peers, newcoin::mtPEERS);
+// 		sendPacket(message);
+// 	}
+// }
 
 // TODO: filter out all the LAN peers
 void Peer::recvPeers(newcoin::TMPeers& packet)
@@ -811,7 +818,7 @@ void Peer::recvPeers(newcoin::TMPeers& packet)
 		{
 			Log(lsINFO) << "Peer: Learning: " << ADDRESS(this) << ": " << i << ": " << strIP << " " << iPort;
 
-			theApp->getConnectionPool().savePeer(strIP, iPort, UniqueNodeList::vsTold);
+			mConnectionPool->savePeer(strIP, iPort, validatorSource::vsTold);
 		}
 	}
 }
@@ -848,211 +855,211 @@ void Peer::recvAccount(newcoin::TMAccount& packet)
 {
 }
 
-void Peer::recvStatus(newcoin::TMStatusChange& packet)
-{
-	Log(lsTRACE) << "Received status change from peer";
-	if (!packet.has_networktime())
-		packet.set_networktime(theApp->getOPs().getNetworkTimeNC());
-	mLastStatus = packet;
+// void Peer::recvStatus(newcoin::TMStatusChange& packet)
+// {
+// 	Log(lsTRACE) << "Received status change from peer";
+// 	if (!packet.has_networktime())
+// 		packet.set_networktime(theApp->getOPs().getNetworkTimeNC());
+// 	mLastStatus = packet;
 
-	if (packet.newevent() == newcoin::neLOST_SYNC)
-	{
-		Log(lsTRACE) << "peer has lost sync";
-		mPreviousLedgerHash.zero();
-		mClosedLedgerHash.zero();
-		return;
-	}
-	if (packet.has_ledgerhash() && (packet.ledgerhash().size() == (256 / 8)))
-	{ // a peer has changed ledgers
-		memcpy(mClosedLedgerHash.begin(), packet.ledgerhash().data(), 256 / 8);
-		mClosedLedgerTime = ptFromSeconds(packet.networktime());
-		Log(lsTRACE) << "peer LCL is " << mClosedLedgerHash.GetHex();
-	}
-	else
-	{
-		Log(lsTRACE) << "peer has no ledger hash";
-		mClosedLedgerHash.zero();
-	}
+// 	if (packet.newevent() == newcoin::neLOST_SYNC)
+// 	{
+// 		Log(lsTRACE) << "peer has lost sync";
+// 		mPreviousLedgerHash.zero();
+// 		mClosedLedgerHash.zero();
+// 		return;
+// 	}
+// 	if (packet.has_ledgerhash() && (packet.ledgerhash().size() == (256 / 8)))
+// 	{ // a peer has changed ledgers
+// 		memcpy(mClosedLedgerHash.begin(), packet.ledgerhash().data(), 256 / 8);
+// 		mClosedLedgerTime = ptFromSeconds(packet.networktime());
+// 		Log(lsTRACE) << "peer LCL is " << mClosedLedgerHash.GetHex();
+// 	}
+// 	else
+// 	{
+// 		Log(lsTRACE) << "peer has no ledger hash";
+// 		mClosedLedgerHash.zero();
+// 	}
 
-	if (packet.has_previousledgerhash() && packet.previousledgerhash().size() == (256 / 8))
-	{
-		memcpy(mPreviousLedgerHash.begin(), packet.previousledgerhash().data(), 256 / 8);
-	}
-	else mPreviousLedgerHash.zero();
-}
+// 	if (packet.has_previousledgerhash() && packet.previousledgerhash().size() == (256 / 8))
+// 	{
+// 		memcpy(mPreviousLedgerHash.begin(), packet.previousledgerhash().data(), 256 / 8);
+// 	}
+// 	else mPreviousLedgerHash.zero();
+// }
 
-void Peer::recvGetLedger(newcoin::TMGetLedger& packet)
-{
-	SHAMap::pointer map;
-	newcoin::TMLedgerData reply;
-	bool fatLeaves = true;
+// void Peer::recvGetLedger(newcoin::TMGetLedger& packet)
+// {
+// 	SHAMap::pointer map;
+// 	newcoin::TMLedgerData reply;
+// 	bool fatLeaves = true;
 
-	if (packet.itype() == newcoin::liTS_CANDIDATE)
-	{ // Request is  for a transaction candidate set
-		Log(lsINFO) << "Received request for TX candidate set data";
-		Ledger::pointer ledger;
-		if ((!packet.has_ledgerhash() || packet.ledgerhash().size() != 32))
-		{
-			punishPeer(PP_INVALID_REQUEST);
-			return;
-		}
-		uint256 txHash;
-		memcpy(txHash.begin(), packet.ledgerhash().data(), 32);
-		map = theApp->getOPs().getTXMap(txHash);
-		if (!map)
-		{
-			Log(lsERROR) << "We do not hav the map our peer wants";
-			punishPeer(PP_INVALID_REQUEST);
-			return;
-		}
-		reply.set_ledgerseq(0);
-		reply.set_ledgerhash(txHash.begin(), txHash.size());
-		reply.set_type(newcoin::liTS_CANDIDATE);
-		fatLeaves = false; // We'll already have most transactions
-	}
-	else
-	{ // Figure out what ledger they want
-		Log(lsINFO) << "Received request for ledger data";
-		Ledger::pointer ledger;
-		if (packet.has_ledgerhash())
-		{
-			uint256 ledgerhash;
-			if (packet.ledgerhash().size() != 32)
-			{
-				punishPeer(PP_INVALID_REQUEST);
-				Log(lsWARNING) << "Invalid request";
-				return;
-			}
-			memcpy(ledgerhash.begin(), packet.ledgerhash().data(), 32);
-			ledger = theApp->getMasterLedger().getLedgerByHash(ledgerhash);
-		}
-		else if (packet.has_ledgerseq())
-			ledger = theApp->getMasterLedger().getLedgerBySeq(packet.ledgerseq());
-		else if (packet.has_ltype() && (packet.ltype() == newcoin::ltCURRENT))
-			ledger = theApp->getMasterLedger().getCurrentLedger();
-		else if (packet.has_ltype() && (packet.ltype() == newcoin::ltCLOSED) )
-		{
-			ledger = theApp->getMasterLedger().getClosedLedger();
-			if (ledger && !ledger->isClosed())
-				ledger = theApp->getMasterLedger().getLedgerBySeq(ledger->getLedgerSeq() - 1);
-		}
-		else
-		{
-			punishPeer(PP_INVALID_REQUEST);
-			Log(lsWARNING) << "Can't figure out what ledger they want";
-			return;
-		}
+// 	if (packet.itype() == newcoin::liTS_CANDIDATE)
+// 	{ // Request is  for a transaction candidate set
+// 		Log(lsINFO) << "Received request for TX candidate set data";
+// 		Ledger::pointer ledger;
+// 		if ((!packet.has_ledgerhash() || packet.ledgerhash().size() != 32))
+// 		{
+// 			punishPeer(PP_INVALID_REQUEST);
+// 			return;
+// 		}
+// 		uint256 txHash;
+// 		memcpy(txHash.begin(), packet.ledgerhash().data(), 32);
+// 		map = theApp->getOPs().getTXMap(txHash);
+// 		if (!map)
+// 		{
+// 			Log(lsERROR) << "We do not hav the map our peer wants";
+// 			punishPeer(PP_INVALID_REQUEST);
+// 			return;
+// 		}
+// 		reply.set_ledgerseq(0);
+// 		reply.set_ledgerhash(txHash.begin(), txHash.size());
+// 		reply.set_type(newcoin::liTS_CANDIDATE);
+// 		fatLeaves = false; // We'll already have most transactions
+// 	}
+// 	else
+// 	{ // Figure out what ledger they want
+// 		Log(lsINFO) << "Received request for ledger data";
+// 		Ledger::pointer ledger;
+// 		if (packet.has_ledgerhash())
+// 		{
+// 			uint256 ledgerhash;
+// 			if (packet.ledgerhash().size() != 32)
+// 			{
+// 				punishPeer(PP_INVALID_REQUEST);
+// 				Log(lsWARNING) << "Invalid request";
+// 				return;
+// 			}
+// 			memcpy(ledgerhash.begin(), packet.ledgerhash().data(), 32);
+// 			ledger = theApp->getMasterLedger().getLedgerByHash(ledgerhash);
+// 		}
+// 		else if (packet.has_ledgerseq())
+// 			ledger = theApp->getMasterLedger().getLedgerBySeq(packet.ledgerseq());
+// 		else if (packet.has_ltype() && (packet.ltype() == newcoin::ltCURRENT))
+// 			ledger = theApp->getMasterLedger().getCurrentLedger();
+// 		else if (packet.has_ltype() && (packet.ltype() == newcoin::ltCLOSED) )
+// 		{
+// 			ledger = theApp->getMasterLedger().getClosedLedger();
+// 			if (ledger && !ledger->isClosed())
+// 				ledger = theApp->getMasterLedger().getLedgerBySeq(ledger->getLedgerSeq() - 1);
+// 		}
+// 		else
+// 		{
+// 			punishPeer(PP_INVALID_REQUEST);
+// 			Log(lsWARNING) << "Can't figure out what ledger they want";
+// 			return;
+// 		}
 
-		if ((!ledger) || (packet.has_ledgerseq() && (packet.ledgerseq()!=ledger->getLedgerSeq())))
-		{
-			punishPeer(PP_UNKNOWN_REQUEST);
-			Log(lsWARNING) << "Can't find the ledger they want";
-			return;
-		}
+// 		if ((!ledger) || (packet.has_ledgerseq() && (packet.ledgerseq()!=ledger->getLedgerSeq())))
+// 		{
+// 			punishPeer(PP_UNKNOWN_REQUEST);
+// 			Log(lsWARNING) << "Can't find the ledger they want";
+// 			return;
+// 		}
 
-		// Fill out the reply
-		uint256 lHash = ledger->getHash();
-		reply.set_ledgerhash(lHash.begin(), lHash.size());
-		reply.set_ledgerseq(ledger->getLedgerSeq());
-		reply.set_type(packet.itype());
+// 		// Fill out the reply
+// 		uint256 lHash = ledger->getHash();
+// 		reply.set_ledgerhash(lHash.begin(), lHash.size());
+// 		reply.set_ledgerseq(ledger->getLedgerSeq());
+// 		reply.set_type(packet.itype());
 
-		if(packet.itype() == newcoin::liBASE)
-		{ // they want the ledger base data
-			Log(lsTRACE) << "Want ledger base data";
-			Serializer nData(128);
-			ledger->addRaw(nData);
-			reply.add_nodes()->set_nodedata(nData.getDataPtr(), nData.getLength());
-			PackedMessage::pointer oPacket = boost::make_shared<PackedMessage>(reply, newcoin::mtLEDGER_DATA);
-			sendPacket(oPacket);
-			return;
-		}
+// 		if(packet.itype() == newcoin::liBASE)
+// 		{ // they want the ledger base data
+// 			Log(lsTRACE) << "Want ledger base data";
+// 			Serializer nData(128);
+// 			ledger->addRaw(nData);
+// 			reply.add_nodes()->set_nodedata(nData.getDataPtr(), nData.getLength());
+// 			PackedMessage::pointer oPacket = boost::make_shared<PackedMessage>(reply, newcoin::mtLEDGER_DATA);
+// 			sendPacket(oPacket);
+// 			return;
+// 		}
 
-		if ((packet.itype() == newcoin::liTX_NODE) || (packet.itype() == newcoin::liAS_NODE))
-			map = (packet.itype() == newcoin::liTX_NODE) ?
-				ledger->peekTransactionMap() : ledger->peekAccountStateMap();
-	}
+// 		if ((packet.itype() == newcoin::liTX_NODE) || (packet.itype() == newcoin::liAS_NODE))
+// 			map = (packet.itype() == newcoin::liTX_NODE) ?
+// 				ledger->peekTransactionMap() : ledger->peekAccountStateMap();
+// 	}
 
-	if ((!map) || (packet.nodeids_size() == 0))
-	{
-		Log(lsWARNING) << "Can't find map or empty request";
-		punishPeer(PP_INVALID_REQUEST);
-		return;
-	}
+// 	if ((!map) || (packet.nodeids_size() == 0))
+// 	{
+// 		Log(lsWARNING) << "Can't find map or empty request";
+// 		punishPeer(PP_INVALID_REQUEST);
+// 		return;
+// 	}
 
-	for(int i = 0; i < packet.nodeids().size(); ++i)
-	{
-		SHAMapNode mn(packet.nodeids(i).data(), packet.nodeids(i).size());
-		if(!mn.isValid())
-		{
-			punishPeer(PP_INVALID_REQUEST);
-			return;
-		}
-		std::vector<SHAMapNode> nodeIDs;
-		std::list< std::vector<unsigned char> > rawNodes;
-		if(map->getNodeFat(mn, nodeIDs, rawNodes, fatLeaves))
-		{
-			std::vector<SHAMapNode>::iterator nodeIDIterator;
-			std::list< std::vector<unsigned char> >::iterator rawNodeIterator;
-			int count = 0;
-			for(nodeIDIterator = nodeIDs.begin(), rawNodeIterator = rawNodes.begin();
-				nodeIDIterator != nodeIDs.end(); ++nodeIDIterator, ++rawNodeIterator)
-			{
-				Serializer nID(33);
-				nodeIDIterator->addIDRaw(nID);
-				newcoin::TMLedgerNode* node = reply.add_nodes();
-				node->set_nodeid(nID.getDataPtr(), nID.getLength());
-				node->set_nodedata(&rawNodeIterator->front(), rawNodeIterator->size());
-				++count;
-			}
-		}
-	}
-	if (packet.has_requestcookie()) reply.set_requestcookie(packet.requestcookie());
-	PackedMessage::pointer oPacket = boost::make_shared<PackedMessage>(reply, newcoin::mtLEDGER_DATA);
-	sendPacket(oPacket);
-}
+// 	for(int i = 0; i < packet.nodeids().size(); ++i)
+// 	{
+// 		SHAMapNode mn(packet.nodeids(i).data(), packet.nodeids(i).size());
+// 		if(!mn.isValid())
+// 		{
+// 			punishPeer(PP_INVALID_REQUEST);
+// 			return;
+// 		}
+// 		std::vector<SHAMapNode> nodeIDs;
+// 		std::list< std::vector<unsigned char> > rawNodes;
+// 		if(map->getNodeFat(mn, nodeIDs, rawNodes, fatLeaves))
+// 		{
+// 			std::vector<SHAMapNode>::iterator nodeIDIterator;
+// 			std::list< std::vector<unsigned char> >::iterator rawNodeIterator;
+// 			int count = 0;
+// 			for(nodeIDIterator = nodeIDs.begin(), rawNodeIterator = rawNodes.begin();
+// 				nodeIDIterator != nodeIDs.end(); ++nodeIDIterator, ++rawNodeIterator)
+// 			{
+// 				Serializer nID(33);
+// 				nodeIDIterator->addIDRaw(nID);
+// 				newcoin::TMLedgerNode* node = reply.add_nodes();
+// 				node->set_nodeid(nID.getDataPtr(), nID.getLength());
+// 				node->set_nodedata(&rawNodeIterator->front(), rawNodeIterator->size());
+// 				++count;
+// 			}
+// 		}
+// 	}
+// 	if (packet.has_requestcookie()) reply.set_requestcookie(packet.requestcookie());
+// 	PackedMessage::pointer oPacket = boost::make_shared<PackedMessage>(reply, newcoin::mtLEDGER_DATA);
+// 	sendPacket(oPacket);
+// }
 
-void Peer::recvLedger(newcoin::TMLedgerData& packet)
-{
-	if (packet.nodes().size() <= 0)
-	{
-		punishPeer(PP_INVALID_REQUEST);
-		return;
-	}
+// void Peer::recvLedger(newcoin::TMLedgerData& packet)
+// {
+// 	if (packet.nodes().size() <= 0)
+// 	{
+// 		punishPeer(PP_INVALID_REQUEST);
+// 		return;
+// 	}
 
-	if (packet.type() == newcoin::liTS_CANDIDATE)
-	{ // got data for a candidate transaction set
-		uint256 hash;
-		if(packet.ledgerhash().size() != 32)
-		{
-			punishPeer(PP_INVALID_REQUEST);
-			return;
-		}
-		memcpy(hash.begin(), packet.ledgerhash().data(), 32);
+// 	if (packet.type() == newcoin::liTS_CANDIDATE)
+// 	{ // got data for a candidate transaction set
+// 		uint256 hash;
+// 		if(packet.ledgerhash().size() != 32)
+// 		{
+// 			punishPeer(PP_INVALID_REQUEST);
+// 			return;
+// 		}
+// 		memcpy(hash.begin(), packet.ledgerhash().data(), 32);
 
 
-		std::list<SHAMapNode> nodeIDs;
-		std::list< std::vector<unsigned char> > nodeData;
+// 		std::list<SHAMapNode> nodeIDs;
+// 		std::list< std::vector<unsigned char> > nodeData;
 
-		for (int i = 0; i < packet.nodes().size(); ++i)
-		{
-			const newcoin::TMLedgerNode& node = packet.nodes(i);
-			if (!node.has_nodeid() || !node.has_nodedata() || (node.nodeid().size() != 33))
-			{
-				Log(lsWARNING) << "LedgerData request with invalid node ID";
-				punishPeer(PP_INVALID_REQUEST);
-				return;
-			}
-			nodeIDs.push_back(SHAMapNode(node.nodeid().data(), node.nodeid().size()));
-			nodeData.push_back(std::vector<unsigned char>(node.nodedata().begin(), node.nodedata().end()));
-		}
-		if (!theApp->getOPs().gotTXData(shared_from_this(), hash, nodeIDs, nodeData))
-			punishPeer(PP_UNWANTED_DATA);
-		return;
-	}
+// 		for (int i = 0; i < packet.nodes().size(); ++i)
+// 		{
+// 			const newcoin::TMLedgerNode& node = packet.nodes(i);
+// 			if (!node.has_nodeid() || !node.has_nodedata() || (node.nodeid().size() != 33))
+// 			{
+// 				Log(lsWARNING) << "LedgerData request with invalid node ID";
+// 				punishPeer(PP_INVALID_REQUEST);
+// 				return;
+// 			}
+// 			nodeIDs.push_back(SHAMapNode(node.nodeid().data(), node.nodeid().size()));
+// 			nodeData.push_back(std::vector<unsigned char>(node.nodedata().begin(), node.nodedata().end()));
+// 		}
+// 		if (!theApp->getOPs().gotTXData(shared_from_this(), hash, nodeIDs, nodeData))
+// 			punishPeer(PP_UNWANTED_DATA);
+// 		return;
+// 	}
 
-	if (!theApp->getMasterLedgerAcquire().gotLedgerData(packet, shared_from_this()))
-		punishPeer(PP_UNWANTED_DATA);
-}
+// 	if (!theApp->getMasterLedgerAcquire().gotLedgerData(packet, shared_from_this()))
+// 		punishPeer(PP_UNWANTED_DATA);
+// }
 
 // Get session information we can sign to prevent man in the middle attack.
 // (both sides get the same information, neither side controls it)
@@ -1083,38 +1090,49 @@ void Peer::getSessionCookie(std::string& strDst)
 	strDst.assign((char *) &sha1[0], sizeof(sha1));
 }
 
-void Peer::sendHello()
-{
-	std::string					strCookie;
-	std::vector<unsigned char>	vchSig;
 
-	getSessionCookie(strCookie);
-	mCookieHash	= Serializer::getSHA512Half(strCookie);
-
-	theApp->getWallet().getNodePrivate().signNodePrivate(mCookieHash, vchSig);
-
-	newcoin::TMHello h;
-
-	h.set_version(theConfig.VERSION);
-	h.set_ledgerindex(theApp->getOPs().getCurrentLedgerID());
-	h.set_nettime(theApp->getOPs().getNetworkTimeNC());
-	h.set_nodepublic(theApp->getWallet().getNodePublic().humanNodePublic());
-	h.set_nodeproof(&vchSig[0], vchSig.size());
-	h.set_ipv4port(theConfig.PEER_PORT);
-
-	Ledger::pointer closedLedger = theApp->getMasterLedger().getClosedLedger();
-	assert(closedLedger && closedLedger->isClosed());
-	if (closedLedger->isClosed())
-	{
-		uint256 hash = closedLedger->getHash();
-		h.set_closedledger(hash.begin(), hash.GetSerializeSize());
-		hash = closedLedger->getParentHash();
-		h.set_previousledger(hash.begin(), hash.GetSerializeSize());
+void Peer::setWallet(std::shared_ptr<IWallet> wallet) {
+	if (wallet) {
+		mWallet = wallet;
+		std::cerr << "Wallet successfully set in ConnectionPool." << std::endl;
 	}
-
-	PackedMessage::pointer packet = boost::make_shared<PackedMessage>(h, newcoin::mtHELLO);
-	sendPacket(packet);
+	else {
+		throw std::invalid_argument("setWallet: Wallet cannot be null.");
+	}
 }
+
+// void Peer::sendHello()
+// {
+// 	std::string					strCookie;
+// 	std::vector<unsigned char>	vchSig;
+
+// 	getSessionCookie(strCookie);
+// 	mCookieHash	= Serializer::getSHA512Half(strCookie);
+
+// 	mWallet->getNodePrivate().signNodePrivate(mCookieHash, vchSig);
+
+// 	newcoin::TMHello h;
+
+// 	h.set_version(theConfig.VERSION);
+// 	h.set_ledgerindex(theApp->getOPs().getCurrentLedgerID());
+// 	h.set_nettime(theApp->getOPs().getNetworkTimeNC());
+// 	h.set_nodepublic(mWallet->getNodePublic().humanNodePublic());
+// 	h.set_nodeproof(&vchSig[0], vchSig.size());
+// 	h.set_ipv4port(theConfig.PEER_PORT);
+
+// 	Ledger::pointer closedLedger = theApp->getMasterLedger().getClosedLedger();
+// 	assert(closedLedger && closedLedger->isClosed());
+// 	if (closedLedger->isClosed())
+// 	{
+// 		uint256 hash = closedLedger->getHash();
+// 		h.set_closedledger(hash.begin(), hash.GetSerializeSize());
+// 		hash = closedLedger->getParentHash();
+// 		h.set_previousledger(hash.begin(), hash.GetSerializeSize());
+// 	}
+
+// 	PackedMessage::pointer packet = boost::make_shared<PackedMessage>(h, newcoin::mtHELLO);
+// 	sendPacket(packet);
+// }
 
 void Peer::sendGetPeers()
 {

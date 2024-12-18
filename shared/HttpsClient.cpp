@@ -46,7 +46,7 @@ void HttpsClient::httpsGet(
 void HttpsClient::httpsNext()
 {
 	// std::cerr << "Fetch: " << mDeqSites[0] << std::endl;
-    boost::shared_ptr<boost::asio::ip::tcp::resolver::query>	query(new boost::asio::ip::tcp::resolver::query(mDeqSites[0], boost::lexical_cast<std::string>(mPort),
+    std::shared_ptr<boost::asio::ip::tcp::resolver::query>	query(new boost::asio::ip::tcp::resolver::query(mDeqSites[0], boost::lexical_cast<std::string>(mPort),
 			ip::resolver_query_base::numeric_service|ip::resolver_query_base::numeric_service));
 	mQuery	= query;
 
@@ -342,7 +342,7 @@ void HttpsClient::httpsGet(
 	boost::posix_time::time_duration timeout,
 	boost::function<void(const boost::system::error_code& ecResult, std::string& strData)> complete) {
 
-    boost::shared_ptr<HttpsClient> client(new HttpsClient(io_service, port, strPath, responseMax));
+    std::shared_ptr<HttpsClient> client(new HttpsClient(io_service, port, strPath, responseMax));
 
 	client->httpsGet(deqSites, timeout, complete);
 }
@@ -358,7 +358,7 @@ void HttpsClient::httpsGet(
 
 	std::deque<std::string> deqSites(1, strSite);
 
-    boost::shared_ptr<HttpsClient> client(new HttpsClient(io_service, port, strPath, responseMax));
+    std::shared_ptr<HttpsClient> client(new HttpsClient(io_service, port, strPath, responseMax));
 
 	client->httpsGet(deqSites, timeout, complete);
 }

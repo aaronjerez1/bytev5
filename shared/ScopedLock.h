@@ -13,7 +13,7 @@
 class ScopedLock
 {
 protected:
-	mutable boost::shared_ptr<boost::interprocess::scoped_lock<boost::recursive_mutex> > mHolder;
+	mutable std::shared_ptr<boost::interprocess::scoped_lock<boost::recursive_mutex> > mHolder;
 
 public:
 	ScopedLock(boost::recursive_mutex& mutex) :

@@ -21,7 +21,7 @@ class HttpsClient : public boost::enable_shared_from_this<HttpsClient>
 private:
     boost::asio::ssl::context									mCtx;
     boost::asio::ip::tcp::resolver								mResolver;
-	boost::shared_ptr<boost::asio::ip::tcp::resolver::query>	mQuery;
+	std::shared_ptr<boost::asio::ip::tcp::resolver::query>	mQuery;
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket>		mSocketSsl;
 	boost::asio::streambuf										mRequest;
     boost::asio::streambuf										mResponse;

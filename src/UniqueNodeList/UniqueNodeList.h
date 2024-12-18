@@ -40,7 +40,7 @@ class UniqueNodeList: public IUniqueNodeList
 private:
 	std::shared_ptr<IDatabaseCon> mWalletDB;
 	boost::asio::io_service& ioService;
-	IConnectionPool&			mConnectionPool;
+	std::shared_ptr<IConnectionPool> mConnectionPool;
 
 	// Misc persistent information
 	boost::posix_time::ptime		mtpScoreUpdated;
@@ -136,7 +136,7 @@ private:
 
 public:
 
-	UniqueNodeList(boost::asio::io_service& io_service, std::shared_ptr<IDatabaseCon> mWalletDB, IConnectionPool& mConnectionPool);
+	UniqueNodeList(boost::asio::io_service& io_service, std::shared_ptr<IDatabaseCon> mWalletDB, std::shared_ptr<IConnectionPool> mConnectionPool);
 
 	// Implementing IUniqueNodeList methods
 	void start() override;

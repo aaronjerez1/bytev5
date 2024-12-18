@@ -36,8 +36,8 @@ class PackedMessage : public boost::enable_shared_from_this<PackedMessage>
 	void encodeHeader(unsigned size, int type);
 
 public:
-    typedef boost::shared_ptr< ::google::protobuf::Message > MessagePointer;
-	typedef boost::shared_ptr<PackedMessage> pointer;
+    typedef std::shared_ptr< ::google::protobuf::Message > MessagePointer;
+	typedef std::shared_ptr<PackedMessage> pointer;
 
     PackedMessage(const ::google::protobuf::Message& message, int type);
 

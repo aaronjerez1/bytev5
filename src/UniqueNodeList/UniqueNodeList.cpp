@@ -14,6 +14,7 @@
 #include <boost/format.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/regex.hpp>
+#include "../ConnectionPool/IConnectionPool.h"
 
 #include <fstream>
 #include <iostream>
@@ -36,7 +37,7 @@
 #define REFERRAL_VALIDATORS_MAX	50
 #define REFERRAL_IPS_MAX		50
 
-UniqueNodeList::UniqueNodeList(boost::asio::io_service& io_service, std::shared_ptr<IDatabaseCon> mWalletDB, IConnectionPool& mConnectionPool) :
+UniqueNodeList::UniqueNodeList(boost::asio::io_service& io_service, std::shared_ptr<IDatabaseCon> mWalletDB, std::shared_ptr<IConnectionPool> mConnectionPool) :
 	ioService(io_service),
 	mdtScoreTimer(io_service),
 	mFetchActive(0),
@@ -542,7 +543,7 @@ void UniqueNodeList::scoreTimerHandler(const boost::system::error_code& err)
 		scoreNext(false);
 
 		// Scan may be dirty due to new ips.
-		mConnectionPool.scanRefresh();
+		mConnectionPool->scanRefresh();
 	}
 }
 

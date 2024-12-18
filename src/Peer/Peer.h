@@ -10,7 +10,7 @@
 #include "../../build/newcoin.pb.h"
 #include "../../shared/PackedMessage.h"
 #include "IPeer.h"
-
+#include "../ConnectionPool/IConnectionPool.h"
 //#include "Ledger.h"
 //#include "Transaction.h"
 
@@ -23,7 +23,7 @@ enum PeerPunish
 
 typedef std::pair<std::string,int> ipPort;
 
-class Peer : public boost::enable_shared_from_this<Peer>, public IPeer
+class Peer : public std::enable_shared_from_this<Peer>, public IPeer
 {
 public:
 	static const int psbGotHello = 0, psbSentHello = 1, psbInMap = 2, psbTrusted = 3;
@@ -39,6 +39,10 @@ private:
 	ipPort			mIpPort;
 	ipPort			mIpPortConnect;
 	uint256			mCookieHash;
+
+	boost::asio::io_service& ioService;
+    std::shared_ptr<IConnectionPool> mConnectionPool;
+   	std::shared_ptr<IWallet> mWallet; //set after constructor
 
 	// network state information
 	uint256						mClosedLedgerHash, mPreviousLedgerHash;
@@ -58,7 +62,7 @@ protected:
 	PackedMessage::pointer mSendingPacket;
 	newcoin::TMStatusChange mLastStatus;
 
-	Peer(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx);
+	Peer(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx, std::shared_ptr<IConnectionPool> mConnectionPool);
 
 	void handleShutdown(const boost::system::error_code& error) { ; }
 
@@ -98,7 +102,7 @@ protected:
 	void getSessionCookie(std::string& strDst);
 
 public:
-	typedef boost::shared_ptr<Peer> pointer;
+	typedef std::shared_ptr<Peer> pointer;
 
 	//bool operator == (const Peer& other);
 
@@ -107,10 +111,8 @@ public:
 
 	void setIpPort(const std::string& strIP, int iPort);
 
-	static pointer create(boost::asio::io_service& io_service, boost::asio::ssl::context& ctx)
-	{
-		return pointer(new Peer(io_service, ctx));
-	}
+	std::shared_ptr<IPeer> create(boost::asio::io_service& io_service, 
+    boost::asio::ssl::context& ctx, std::shared_ptr<IConnectionPool> mConnectionPool) override;
 
 	boost::asio::ssl::stream<boost::asio::ip::tcp::socket>::lowest_layer_type& getSocket()
 	{
@@ -123,9 +125,9 @@ public:
 	bool samePeer(Peer::pointer p) { return samePeer(*p); }
 	bool samePeer(const Peer& p) { return this == &p; }
 
-	void sendPacket(PackedMessage::pointer packet);
-	void sendLedgerProposal(Ledger::pointer ledger);
-	void sendFullLedger(Ledger::pointer ledger);
+	void sendPacket(PackedMessage::pointer packet) override;
+	// void sendLedgerProposal(Ledger::pointer ledger) override;
+	// void sendFullLedger(Ledger::pointer ledger) override;
 	void sendGetFullLedger(uint256& hash);
 	void sendGetPeers();
 
@@ -135,13 +137,15 @@ public:
 	bool isConnected() const { return mHelloed && !mDetaching; }
 
 	//static PackedMessage::pointer createFullLedger(Ledger::pointer ledger);
-	static PackedMessage::pointer createLedgerProposal(Ledger::pointer ledger);
-	static PackedMessage::pointer createValidation(Ledger::pointer ledger);
-	static PackedMessage::pointer createGetFullLedger(uint256& hash);
+	// static PackedMessage::pointer createLedgerProposal(Ledger::pointer ledger);
+	// static PackedMessage::pointer createValidation(Ledger::pointer ledger);
+	PackedMessage::pointer createGetFullLedger(uint256& hash) override;
 
 	uint256 getClosedLedgerHash() const { return mClosedLedgerHash; }
 	NewcoinAddress getNodePublic() const { return mNodePublic; }
 	void cycleStatus() { mPreviousLedgerHash = mClosedLedgerHash; mClosedLedgerHash.zero(); }
+
+    void setWallet(std::shared_ptr<IWallet> wallet) override;
 };
 
 #endif

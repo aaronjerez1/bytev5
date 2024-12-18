@@ -15,7 +15,7 @@ typedef std::pair<int, std::vector<unsigned char> > TaggedListItem;
 class Serializer
 {
 public:
-	typedef boost::shared_ptr<Serializer> pointer;
+	typedef std::shared_ptr<Serializer> pointer;
 
 protected:
 	std::vector<unsigned char> mData;

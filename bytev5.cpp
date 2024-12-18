@@ -39,17 +39,19 @@ int main() {
 	//Trasaction				mpTransaction();
 	//Ledger					mpLedger();
 	//Peer					mPeer(/*LEDGER, TRASACTION*/); // INJECT LEDGER AND TRANSACTION
-	Peer mPeer;
+	auto mPeer = std::make_shared<Peer>();
 	//auto mConnectionPool = std::make_shared<ConnectionPool>(ioService, mWalletDB.get(), mPeer);
 
-	ConnectionPool			mConnectionPool(ioService, mWalletDB, mPeer); // Peer, walletdb,//mWallet//, prob the config, ///uniquenode list//,ioservice (done?)
+	auto mConnectionPool = std::make_shared<ConnectionPool>(ioService, mWalletDB, mPeer); // Peer, walletdb,//mWallet//, prob the config, ///uniquenode list//,ioservice (done?)
 
-	auto mUNL = std::make_shared<UniqueNodeList>(ioService, mWalletDB.get(), mConnectionPool);
+	auto mUNL = std::make_shared<UniqueNodeList>(ioService, mWalletDB, mConnectionPool);
 	auto mWallet = std::make_shared<Wallet>(mWalletDB, mUNL);
 
 	// factory pattern
-	mConnectionPool.setWallet(mWallet);
-	mConnectionPool.setUniqueNodeList(mUNL);
+	mConnectionPool->setWallet(mWallet);
+	mConnectionPool->setUniqueNodeList(mUNL);
+
+	mPeer->setWallet(mWallet);
 	//
 	Application app(ioService, mWallet);
 
